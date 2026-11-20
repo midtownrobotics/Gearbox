@@ -99,6 +99,16 @@ export async function createTeam(): Promise<string> {
   return `frc${number}`;
 }
 
+/** Switches email and password sign-in on for the team (G3's by default), which is off until then. */
+export async function allowEmailSignIn(teamId: string = siteTeamId) {
+  await testEnv.DB.prepare(
+    `INSERT INTO team_sign_in_methods (team_id, email_password, updated_at) VALUES (?, 1, 0)
+     ON CONFLICT (team_id) DO UPDATE SET email_password = 1`,
+  )
+    .bind(teamId)
+    .run();
+}
+
 /** A signed-in browser session for the user, as its Cookie header. */
 export async function sessionCookie(userId: string): Promise<string> {
   return `g3_session=${await createSession(userId, testEnv)}`;

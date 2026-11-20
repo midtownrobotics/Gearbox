@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from "vitest";
-import { createUser, g3id, sessionCookie } from "./helpers";
+import { allowEmailSignIn, createUser, g3id, sessionCookie } from "./helpers";
 
 describe("roles", () => {
   it("keeps admin routes to admins", async () => {
@@ -60,6 +60,7 @@ describe("roles", () => {
     const id = await createUser({ email: "new@test.g3", password: "password1", status: "pending" });
     const approve = await g3id(`/admin/users/${id}/approve`, { method: "POST", cookie: admin });
     expect(approve.status).toBe(200);
+    await allowEmailSignIn();
     const login = await g3id("/auth/login/email", {
       method: "POST",
       body: { email: "new@test.g3", password: "password1" },

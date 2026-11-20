@@ -39,6 +39,8 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "id", method: "*", path: /^\/admin\/kiosk\// },
   { app: "id", method: "POST", path: /^\/kiosk\/activate/ },
   { app: "id", method: "POST", path: /^\/auth\/(password|pin\/regenerate|login\/email)/ },
+  // Signing up with email sends one.
+  { app: "id", method: "POST", path: /^\/auth\/signup\/email/ },
   { app: "id", method: "DELETE", path: /^\/auth\/identities\// },
   // The team's apps stay on, and nothing is sent to Slack or Discord.
   { app: "platform", method: "PUT", path: /^\/team\/library\// },

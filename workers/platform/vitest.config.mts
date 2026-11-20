@@ -41,6 +41,18 @@ const g3id = async (request: Request) => {
   if (!url.pathname.startsWith("/api/internal/")) return g3idStub(request);
   const path = url.pathname.replace(/^\/api\/internal/, "");
   if (path === "/teams") return Response.json({ ok: true });
+  // What G3ID emailed in its sending limit's window (the console's Cloudflare page): near its limit.
+  if (path === "/email/usage") {
+    return Response.json({
+      ready: true,
+      limit: 2900,
+      windowDays: 31,
+      sent: 2400,
+      days: [{ day: "2026-11-01", count: 2400 }],
+      byKind: { "add-password": 100, signup: 2000, reset: 280, "account-exists": 20 },
+      teams: [{ teamId: "frc1648", count: 2400 }],
+    });
+  }
   if (path === "/stats") {
     return Response.json({
       active: 12,
@@ -287,6 +299,17 @@ const cloudflare = async (request: Request) => {
                         { edgeResponseStatus: 503, requests: 5 },
                       ],
                     },
+                  },
+                ],
+                // Email Sending: 2,510 this period, near the 3,000 included.
+                emailSendingAdaptiveGroups: [
+                  {
+                    count: 2500,
+                    dimensions: { status: "delivered", sendingDomain: "frcgearbox.com" },
+                  },
+                  {
+                    count: 10,
+                    dimensions: { status: "deliveryFailed", sendingDomain: "frcgearbox.com" },
                   },
                 ],
                 firewallEventsAdaptive: Array.from({ length: 4 }, () => ({

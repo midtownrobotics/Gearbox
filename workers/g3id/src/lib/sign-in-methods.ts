@@ -4,17 +4,29 @@ import { eq } from "drizzle-orm";
 import { createDb } from "../db";
 import { discordInstallations, teamSignInMethods } from "../db/schema";
 import type { AppEnv } from "../types";
+import { emailSignInReady } from "./email-sign-in";
 
 // The sign-in methods a team allows (team_sign_in_methods), chosen by its admins on the Sign-in
 // page of the team's admin pages. A method that's off can't sign anyone in or be linked to an
 // account; people already signed in stay signed in. The team's chat is always on: members join
 // through it. That's Discord for a team that connected Discord, else Slack (a team has one).
 
-export const SIGN_IN_METHODS = ["slack", "discord", "google", "github", "steam", "pin"] as const;
+export const SIGN_IN_METHODS = [
+  "slack",
+  "discord",
+  "google",
+  "github",
+  "steam",
+  "pin",
+  "email",
+] as const;
 export type SignInMethod = (typeof SIGN_IN_METHODS)[number];
 export type SignInMethods = Record<SignInMethod, boolean>;
 
-/** The ones a team can switch off. */
+/**
+ * The ones a team can switch off, on unless it does. Email and password (`email`) is switched
+ * apart from these: it's off unless the team chooses it (lib/email-sign-in.ts).
+ */
 export const OPTIONAL_METHODS = ["google", "github", "steam", "pin"] as const;
 export type OptionalMethod = (typeof OPTIONAL_METHODS)[number];
 
@@ -25,10 +37,15 @@ export const METHOD_LABELS: Record<SignInMethod, string> = {
   github: "GitHub",
   steam: "Steam",
   pin: "Kiosk PIN",
+  email: "Email and password",
 };
 
 type Db = ReturnType<typeof createDb>;
 
+/**
+ * What the team chose. For `email`, only its admins' choice: whether this deployment can send
+ * email too is `emailSignInReady`, which `methodOff` and the public view check.
+ */
 export async function signInMethods(db: Db, teamId: string): Promise<SignInMethods> {
   const [row, discord] = await Promise.all([
     db.select().from(teamSignInMethods).where(eq(teamSignInMethods.teamId, teamId)).get(),
@@ -40,7 +57,15 @@ export async function signInMethods(db: Db, teamId: string): Promise<SignInMetho
   ]);
   // The public demo signs nobody in these ways: visitors pick a role (routes/demo.ts).
   if (isDemoTeam(teamId)) {
-    return { slack: false, discord: false, google: false, github: false, steam: false, pin: false };
+    return {
+      slack: false,
+      discord: false,
+      google: false,
+      github: false,
+      steam: false,
+      pin: false,
+      email: false,
+    };
   }
   return {
     slack: !discord,
@@ -49,6 +74,7 @@ export async function signInMethods(db: Db, teamId: string): Promise<SignInMetho
     github: row ? row.github === 1 : true,
     steam: row ? row.steam === 1 : true,
     pin: row ? row.kioskPin === 1 : true,
+    email: row?.emailPassword === 1,
   };
 }
 
@@ -79,8 +105,9 @@ export async function methodOff(
   method: SignInMethod,
 ): Promise<string | null> {
   const methods = await signInMethods(createDb(env.DB), teamId);
-  if (methods[method]) return null;
+  if (methods[method] && (method !== "email" || emailSignInReady(env))) return null;
   if (method === "pin") return "Kiosk sign-in is off for this team.";
+  if (method === "email") return "Your team doesn't use email and password to sign in.";
   const chat = methods.discord ? "Discord" : methods.slack ? "Slack" : null;
   return `Your team doesn't use ${METHOD_LABELS[method]} to sign in.${chat ? ` Sign in with ${chat} instead.` : ""}`;
 }

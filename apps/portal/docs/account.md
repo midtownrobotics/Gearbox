@@ -8,5 +8,6 @@ pages: /account
 Open your Account page from "Hello, name" at the right of the bar in any app.
 
 - **Linked accounts:** add Google, GitHub, Steam, or your team's chat to your account, so you can sign in with any of them. Your team's admins choose which are offered.
+- **Add a password:** when your team signs in with email, choose a password and enter the code we email you. Then you can sign in with your email and that password. **Change your password** sends a new code the same way.
 - **Kiosk PIN:** **View PIN** shows your 3-digit PIN for signing in on the shop's shared computers.
 - **Sign out.**

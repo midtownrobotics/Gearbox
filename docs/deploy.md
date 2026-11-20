@@ -134,6 +134,17 @@ A team's admins can let people sign up with Google or GitHub instead of the team
 3. **Migration:** G3ID's `0023_open_signup.sql` runs before the Workers deploy, as usual.
 4. **Local dev and tests** use Cloudflare's test keys, which always pass (`[vars]` in `workers/g3id/wrangler.toml`).
 
+## Email (once)
+
+Teams can switch on email and password sign-in (Portal's Admin → Sign-in), off by default. Every password goes with an email checked by a 6-digit code, which G3ID sends with Cloudflare Email Service's Email Sending (approved on 20 November 2026; roadmap, "Hosting and stack decisions"). It's on Workers Paid: 3,000 emails a month for the whole account, then $0.35 per 1,000. G3ID is the only worker that sends (`workers/g3id/src/lib/email.ts`), and it never sends past its `EMAIL_LIMIT` in any 31 days: production's is 2,900 (its `wrangler.toml`), staging's 100 (`scripts/configure.ts`), so together they stay inside the 3,000 whenever the billing period starts. The console's Cloudflare page shows both counts. Email sign-in also needs Turnstile (above): until both are set up, its switch says it isn't available.
+
+1. **Onboard the sending domains** (Cloudflare dashboard → Email Service → Email Sending, or `pnpm exec wrangler email sending enable frcgearbox.com`, then the same for `g3robotics.com`, for staging). This adds the SPF and DKIM records Email Sending needs; the zones' DNS is already on Cloudflare. G3ID sends from `noreply@<platform domain>` as "Gearbox".
+2. **Deploy:** `[[env.production.send_email]]` in `workers/g3id/wrangler.toml` is the binding (staging's is generated); nothing else to set. Migration `0026_email_sign_in.sql` runs before the Workers deploy, as usual.
+3. **Check:** switch email on for a test team, add a password on its Account page, and look for the code (check the spam folder). New accounts start with a small daily allowance that Cloudflare raises over time; ask for more on its limits page if sign-ups need it.
+4. **Local dev and tests** send nothing: Wrangler keeps each email and prints where (`send_email binding called with MessageBuilder`), so the code is in the terminal.
+
+The limit is checked before each email (`email_sends`, counts by day, team and kind, never the address). To change it, change `EMAIL_LIMIT` (production) or `STAGING_EMAIL_LIMIT` (staging), keeping their sum within what the plan includes, and run `pnpm configure`.
+
 ## Switching over from Pages and per-app API domains (once, done)
 
 The app workers' old `api.<app>` custom domains send requests straight to the worker, without the `/api` the gateway adds, so they must go when the new workers go live. Do this at a quiet time; the apps are down for the few minutes between steps 3 and 5.
@@ -178,7 +189,7 @@ The console's Cloudflare page shows the account's usage this billing period agai
 
 1. In the Cloudflare dashboard, **My Profile → API Tokens → Create Token → Custom token** (a user token: an account API token, under Manage account, can't read D1, R2, KV, Queues or Workers AI usage), named "Gearbox console (read-only)", with two policies, all **Read**:
    - **Account** (the Gearbox account): Account Analytics, Billing, Workers Scripts, D1, Workers KV Storage, Workers R2 Storage, Queues, Workers AI. Billing is for the billing period, since what the plan includes resets on the billing date; without it the page counts the calendar month.
-   - **Zone** (all zones in the Gearbox account): Zone, Analytics.
+   - **Zone** (all zones in the Gearbox account): Zone, Analytics. The Email part reads Email Sending's analytics on each zone; if it says Cloudflare didn't answer, add the zones' Email Sending (or Email) **Read** permission too.
 2. In `workers/platform`, pasting only the value at each prompt:
    ```bash
    pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN --env production

@@ -28,10 +28,11 @@ export function NamePage() {
       .then(async (res) => {
         const data = (await res.json()) as { username?: string; error?: string };
         if (!res.ok) return setExpired(data.error ?? "This link has expired.");
-        setName(data.username ?? "");
+        // Signing up with email gives no name to start from.
+        setName(via === "email" ? "" : (data.username ?? ""));
       })
       .catch(() => setExpired("Could not reach the server. Reload the page to try again."));
-  }, [token]);
+  }, [token, via]);
 
   async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
@@ -44,7 +45,9 @@ export function NamePage() {
         setError(data.error ?? "That didn't work. Try again.");
         return;
       }
-      navigate(provider ? `/signup/pending?with=${via}` : "/signup/pending", { replace: true });
+      navigate(provider || via === "email" ? `/signup/pending?with=${via}` : "/signup/pending", {
+        replace: true,
+      });
     } catch {
       setError("Could not reach the server. Try again.");
     } finally {
@@ -77,9 +80,11 @@ export function NamePage() {
             <Field
               label="Full name"
               hint={
-                provider
-                  ? `Filled in from your ${provider} account.`
-                  : `Filled in from your ${chat} name.`
+                via === "email"
+                  ? undefined
+                  : provider
+                    ? `Filled in from your ${provider} account.`
+                    : `Filled in from your ${chat} name.`
               }
             >
               <TextField
