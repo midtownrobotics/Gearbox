@@ -20,7 +20,7 @@ import {
   plannerSettings,
 } from "../db/schema";
 import { listColumns } from "./columns";
-import { nowSeconds } from "./input";
+import { dayIn, nowSeconds } from "./input";
 
 // Meeting overviews: a message on the team's chat (Slack or Discord, through G3ID) listing what's
 // Not Started and Started (the cards in the board's middle columns). Only the team's latest overview is kept up to
@@ -34,7 +34,26 @@ type Env = { G3ID: Fetcher };
 /** Room for the text: one Discord message is 2,000 characters. */
 const LIMIT = 1900;
 
-export type OverviewCard = { id: number; title: string; status: Status; names: string[] };
+export type OverviewCard = {
+  id: number;
+  title: string;
+  status: Status;
+  names: string[];
+  /** "YYYY-MM-DD", or null. */
+  dueDate?: string | null;
+};
+
+/** A due date as the overview says it: "Fri, Nov 21", with the year when it isn't this one. */
+export function dueLabel(dueDate: string, now = new Date()): string {
+  const [y, m, d] = dueDate.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    ...(y === now.getUTCFullYear() ? {} : { year: "numeric" }),
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+}
 
 /** The overview's lists: a card in Done is shown in the one it was last in. */
 export type Section = Exclude<Status, "done">;
@@ -81,7 +100,9 @@ export function overviewText(
   const line = (card: OverviewCard) => {
     const title = plainChatText(card.title) || "Untitled";
     const who = card.names.length ? ` (${card.names.map(plainChatText).join(", ")})` : "";
-    return card.status === "done" ? `• ~~${title}~~${who}` : `• ${title}${who}`;
+    if (card.status === "done") return `• ~~${title}~~${who}`;
+    const due = card.dueDate ? ` · due ${dueLabel(card.dueDate)}` : "";
+    return `• ${title}${who}${due}`;
   };
   const lists = SECTIONS.map(({ section, title }) => ({
     title,
@@ -120,10 +141,23 @@ export function overviewText(
  * The board as the overview shows it: every card with the names of who's on it, in board order
  * (the middle columns left to right, each top to bottom).
  */
-async function boardFor(db: Db, env: Env, teamId: string): Promise<OverviewCard[]> {
+async function boardFor(
+  db: Db,
+  env: Env,
+  teamId: string,
+  /** The overview's day ("YYYY-MM-DD"): cards scheduled after it aren't on the board yet. */
+  today: string,
+): Promise<OverviewCard[]> {
   const [rows, members, people, columns] = await Promise.all([
     db
-      .select({ id: cards.id, title: cards.title, status: cards.status, columnId: cards.columnId })
+      .select({
+        id: cards.id,
+        title: cards.title,
+        status: cards.status,
+        columnId: cards.columnId,
+        dueDate: cards.dueDate,
+        startsOn: cards.startsOn,
+      })
       .from(cards)
       .where(inTeam(cards, teamId))
       .orderBy(asc(cards.sortOrder), asc(cards.id))
@@ -140,6 +174,7 @@ async function boardFor(db: Db, env: Env, teamId: string): Promise<OverviewCard[
   const names = new Map((people ?? []).map((m) => [m.id, m.displayName]));
   const place = new Map(columns.map((col, i) => [col.id, i]));
   const ordered = rows
+    .filter((card) => !card.startsOn || card.startsOn <= today)
     .map((card, i) => ({ card, i }))
     .sort(
       (a, b) =>
@@ -147,7 +182,7 @@ async function boardFor(db: Db, env: Env, teamId: string): Promise<OverviewCard[
         a.i - b.i,
     )
     .map(({ card }) => card);
-  return ordered.map(({ columnId: _, ...card }) => ({
+  return ordered.map(({ columnId: _, startsOn: __, ...card }) => ({
     ...card,
     names: members
       .filter((m) => m.cardId === card.id && names.has(m.userId))
@@ -205,11 +240,11 @@ export async function sendOverview(
   const channel = await overviewChannel(db, teamId);
   if (!channel)
     return { ok: false, error: "Choose a channel for overviews on Planner's Admin page." };
-  const board = await boardFor(db, env, teamId);
+  const postedAt = nowSeconds();
+  const board = await boardFor(db, env, teamId, dayIn(timeZone, postedAt));
   const open = new Map(
     board.flatMap((c) => (c.status === "done" ? [] : [[c.id, c.status as Section] as const])),
   );
-  const postedAt = nowSeconds();
   const text = overviewText(
     board,
     open,
@@ -251,14 +286,15 @@ export async function updateOverview(db: Db, env: Env, teamId: string): Promise<
       .limit(1)
       .get();
     if (!latest) return;
-    const board = await boardFor(db, env, teamId);
+    const timeZone = parseTimeZone(latest.timeZone) ?? "UTC";
+    const board = await boardFor(db, env, teamId, dayIn(timeZone));
     await remember(db, teamId, latest.id, board);
     const text = overviewText(
       board,
       await cardsOn(db, teamId, latest.id),
       teamAppUrl(teamId, "planner"),
       // Always the day it was sent, however long it keeps updating.
-      overviewDate(latest.postedAt, parseTimeZone(latest.timeZone) ?? "UTC"),
+      overviewDate(latest.postedAt, timeZone),
     );
     if (text === latest.lastText) return;
     const message: TeamMessageRef = {

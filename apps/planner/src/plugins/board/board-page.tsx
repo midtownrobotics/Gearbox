@@ -16,6 +16,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { ConfirmQuestion, Dialog, ErrorBanner, Page, PageLoading } from "@g3/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { type BoardCard, type BoardData, api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import {
@@ -26,6 +27,7 @@ import {
   columnOfLane,
   laneId,
 } from "../../shared/columns";
+import { isScheduled } from "../../shared/dates";
 import { AddCard } from "./add-card";
 import { CardDialog } from "./card-dialog";
 import { BoardColumn, CardFace } from "./column";
@@ -40,16 +42,22 @@ import { SendOverview } from "./send-overview";
 /** How often the board asks for everyone's changes. */
 const POLL_MS = 5000;
 
-/** The board on screen: the middle columns, and each column's cards by its `laneId`, top first. */
-type Board = { middle: MiddleColumn[]; lanes: Record<string, BoardCard[]> };
+/**
+ * The board on screen: the middle columns, each column's cards by its `laneId` (top first), and
+ * the cards scheduled for a later day, off the board until then (soonest first).
+ */
+type Board = { middle: MiddleColumn[]; lanes: Record<string, BoardCard[]>; scheduled: BoardCard[] };
 
 function boardOf(data: BoardData): Board {
   const lanes: Record<string, BoardCard[]> = {};
   for (const column of allColumns(data.columns)) lanes[laneId(column)] = [];
+  const scheduled: BoardCard[] = [];
   for (const card of [...data.cards].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)) {
-    (lanes[laneId(card.column)] ?? lanes.not_started).push(card);
+    if (isScheduled(card)) scheduled.push(card);
+    else (lanes[laneId(card.column)] ?? lanes.not_started).push(card);
   }
-  return { middle: data.columns, lanes };
+  scheduled.sort((a, b) => (a.startsOn ?? "").localeCompare(b.startsOn ?? "") || a.id - b.id);
+  return { middle: data.columns, lanes, scheduled };
 }
 
 /** The lane a draggable or droppable id is in: a lane's own id, or a card's. */
@@ -60,14 +68,29 @@ function laneOf(board: Board, id: UniqueIdentifier): string | null {
   );
 }
 
-const everyCard = (board: Board) => Object.values(board.lanes).flat();
+const everyCard = (board: Board) => [...Object.values(board.lanes).flat(), ...board.scheduled];
 
 export function BoardPage() {
   const { canEdit, canAssign, isAdmin, isMentor, userId: me } = useAuthUser();
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragged, setDragged] = useState<BoardCard | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  // The open card is in the address (`?card=<id>`), so the Calendar can link to one.
+  const [params, setParams] = useSearchParams();
+  const editingId = Number(params.get("card")) || null;
+  const setEditingId = useCallback(
+    (id: number | null) =>
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if (id === null) next.delete("card");
+          else next.set("card", String(id));
+          return next;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
   /** The card an admin asked to delete, waiting for their yes. */
   const [deleting, setDeleting] = useState<BoardCard | null>(null);
   const [names, setNames] = useState<Map<string, string>>(new Map());
@@ -143,16 +166,13 @@ export function BoardPage() {
         ? [...card.memberIds.filter((id) => id !== userId), userId]
         : card.memberIds.filter((id) => id !== userId);
       const lane = laneId(card.column);
+      const update = (c: BoardCard) => (c.id === card.id ? { ...c, memberIds } : c);
       setBoard((current) =>
         current?.lanes[lane]
           ? {
               ...current,
-              lanes: {
-                ...current.lanes,
-                [lane]: current.lanes[lane].map((c) =>
-                  c.id === card.id ? { ...c, memberIds } : c,
-                ),
-              },
+              lanes: { ...current.lanes, [lane]: current.lanes[lane].map(update) },
+              scheduled: current.scheduled.map(update),
             }
           : current,
       );
@@ -303,7 +323,11 @@ export function BoardPage() {
       >
         {error && <ErrorBanner message={error} />}
         {canEdit && (
-          <AddCard onAdd={(title) => change(() => api.cards.$post({ json: { title } }))} />
+          <AddCard
+            onAdd={(title, dates) => change(() => api.cards.$post({ json: { title, ...dates } }))}
+            scheduled={board.scheduled}
+            onOpen={(card) => setEditingId(card.id)}
+          />
         )}
         <DndContext
           sensors={sensors}
@@ -342,9 +366,9 @@ export function BoardPage() {
             }))}
             canEdit={canEdit}
             onClose={() => setEditingId(null)}
-            onRename={(title) =>
+            onSave={(changes) =>
               change(() =>
-                api.cards[":id"].$patch({ param: { id: String(editing.id) }, json: { title } }),
+                api.cards[":id"].$patch({ param: { id: String(editing.id) }, json: changes }),
               )
             }
             onMove={(column: Column) =>

@@ -6,7 +6,8 @@ import { type Status, cardMembers, cards } from "./db/schema";
 import { addColumn } from "./lib/columns";
 
 // The public demo's Planner (roadmap 5.3), loaded after its nightly reset: a board with two
-// middle columns, a few cards in each column, and people on the ones under way.
+// middle columns, a few cards in each column, people on the ones under way, and due dates on the
+// first card of each open column (a few days from the reset, so they never go stale).
 
 const NOT_STARTED = ["Order spare bearings", "Practice autos", "Write the build log"];
 const MIDDLE: { name: string; cards: string[] }[] = [
@@ -27,12 +28,15 @@ export async function loadDemo(db: Db, teamId: string) {
   }
   lanes.push({ status: "done", columnId: null, titles: DONE });
 
-  const rows = lanes.flatMap(({ status, columnId, titles }) =>
+  const daysFromNow = (days: number) =>
+    new Date((seconds + days * 86_400) * 1000).toISOString().slice(0, 10);
+  const rows = lanes.flatMap(({ status, columnId, titles }, lane) =>
     titles.map((title, sortOrder) => ({
       title,
       status,
       columnId,
       sortOrder,
+      dueDate: status !== "done" && sortOrder === 0 ? daysFromNow(3 + lane * 4) : null,
       createdBy: mentor.id,
       createdAt: seconds,
       updatedAt: seconds,

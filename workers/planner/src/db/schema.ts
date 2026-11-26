@@ -39,6 +39,13 @@ export const cards = sqliteTable(
     columnId: integer("column_id").references(() => boardColumns.id),
     /** Its place in its column, top first. Gaps are fine: only the order counts. */
     sortOrder: integer("sort_order").notNull(),
+    /** When it's due, if ever: a calendar day ("2026-11-21"), the same for everyone. */
+    dueDate: text("due_date"),
+    /**
+     * A card scheduled ahead: off the board until this day (in the viewer's time zone), then in
+     * Not Started. Null once it's on the board.
+     */
+    startsOn: text("starts_on"),
     /** G3ID user id. */
     createdBy: text("created_by").notNull(),
     createdAt: integer("created_at").notNull(),

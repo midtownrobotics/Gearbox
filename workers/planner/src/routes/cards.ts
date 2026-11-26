@@ -14,12 +14,12 @@ import { type Db, createDb } from "../db";
 import { cardMembers, cards } from "../db/schema";
 import { CARD_COLUMNS, addCard, afterChange, toCard } from "../lib/cards";
 import { type Column, inColumn, isTeamColumn, parseColumn, placeOf } from "../lib/columns";
-import { nowSeconds, parseId, parseTitle } from "../lib/input";
+import { nowSeconds, parseDueDate, parseId, parseTitle } from "../lib/input";
 import { requireAssigner } from "../lib/trusted";
 import type { AppEnv } from "../types";
 
 // The team's board. Everyone signed in reads it; everyone but a kiosk adds, renames and moves
-// cards, and puts themselves on a card or takes themselves off. Mentors, admins and trusted
+// cards, sets their due dates, and puts themselves on a card or takes themselves off. Mentors, admins and trusted
 // students (src/lib/trusted.ts) put anyone on a card or take them off. Only admins delete cards. Pages
 // poll GET /board (src/index.ts), so everyone's board follows the others'.
 
@@ -29,16 +29,44 @@ const TITLE_ERROR = "Give the card a title (up to 200 characters).";
 const fieldsOf = (value: unknown) =>
   (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
 
-const newCard = validator("json", (value, c): { title: string } => {
-  const title = parseTitle(fieldsOf(value).title);
-  if (!title) return c.json({ error: TITLE_ERROR }, 400) as never;
-  return { title };
-});
+const DATE_ERROR = "Give dates as a day, like 2026-11-21.";
 
-const rename = validator("json", (value, c): { title: string } => {
-  const title = parseTitle(fieldsOf(value).title);
-  if (!title) return c.json({ error: TITLE_ERROR }, 400) as never;
-  return { title };
+/** A new card: its title, and a due date and a day to put it on the board, if it has them. */
+const newCard = validator(
+  "json",
+  (value, c): { title: string; dueDate: string | null; startsOn: string | null } => {
+    const v = fieldsOf(value);
+    const title = parseTitle(v.title);
+    if (!title) return c.json({ error: TITLE_ERROR }, 400) as never;
+    const dueDate = parseDueDate(v.dueDate);
+    const startsOn = parseDueDate(v.startsOn);
+    if (dueDate === false || startsOn === false) {
+      return c.json({ error: DATE_ERROR }, 400) as never;
+    }
+    return { title, dueDate: dueDate ?? null, startsOn: startsOn ?? null };
+  },
+);
+
+type Changes = { title?: string; dueDate?: string | null; startsOn?: string | null };
+
+/** A card's changes: a new title, its due date or its scheduled day (null clears either). */
+const edit = validator("json", (value, c): Changes => {
+  const v = fieldsOf(value);
+  const changes: Changes = {};
+  if (v.title !== undefined) {
+    const title = parseTitle(v.title);
+    if (!title) return c.json({ error: TITLE_ERROR }, 400) as never;
+    changes.title = title;
+  }
+  const dueDate = parseDueDate(v.dueDate);
+  const startsOn = parseDueDate(v.startsOn);
+  if (dueDate === false || startsOn === false) return c.json({ error: DATE_ERROR }, 400) as never;
+  if (dueDate !== undefined) changes.dueDate = dueDate;
+  if (startsOn !== undefined) changes.startsOn = startsOn;
+  if (!Object.keys(changes).length) {
+    return c.json({ error: "Say what to change: the title or a date." }, 400) as never;
+  }
+  return changes;
 });
 
 const place = validator("json", (value, c): { column: Column; index: number } => {
@@ -82,22 +110,25 @@ export const cardsRouter = new Hono<AppEnv>()
     if (!members) return c.json({ error: "Can't reach the team's member list. Try again." }, 503);
     return c.json(members.map(({ id, displayName }) => ({ id, displayName })));
   })
-  // A new card, at the bottom of Not Started: every card starts there.
+  // A new card, at the bottom of Not Started: every card starts there, at once or on its
+  // `startsOn` day (it's off the board until then).
   .post("/", requireAuth, requireOAuthSession, newCard, async (c) => {
-    const { title } = c.req.valid("json");
+    const { title, ...dates } = c.req.valid("json");
     const teamId = c.get("teamId");
-    const card = await addCard(createDb(c.env.PLANNER_DB), teamId, title, c.get("userId"));
+    const db = createDb(c.env.PLANNER_DB);
+    const card = await addCard(db, teamId, title, c.get("userId"), dates);
     afterChange(c);
     return c.json(card, 201);
   })
-  .patch("/:id", requireAuth, requireOAuthSession, rename, async (c) => {
+  // Renames a card, or sets or clears its due date.
+  .patch("/:id", requireAuth, requireOAuthSession, edit, async (c) => {
     const id = parseId(c.req.param("id"));
     if (!id) return c.json({ error: "Card not found." }, 404);
-    const { title } = c.req.valid("json");
+    const changes = c.req.valid("json");
     const db = createDb(c.env.PLANNER_DB);
     const [card] = await db
       .update(cards)
-      .set({ title, updatedAt: nowSeconds() })
+      .set({ ...changes, updatedAt: nowSeconds() })
       .where(inTeam(cards, c.get("teamId"), eq(cards.id, id)))
       .returning(CARD_COLUMNS);
     if (!card) return c.json({ error: "Card not found." }, 404);
@@ -136,7 +167,10 @@ export const cardsRouter = new Hono<AppEnv>()
     const [first, ...rest] = order.map((cardId, sortOrder) =>
       db
         .update(cards)
-        .set(cardId === id ? { ...place, sortOrder, updatedAt: now } : { sortOrder })
+        // A scheduled card moved by hand is on the board from now on.
+        .set(
+          cardId === id ? { ...place, sortOrder, startsOn: null, updatedAt: now } : { sortOrder },
+        )
         .where(inTeam(cards, teamId, eq(cards.id, cardId))),
     );
     await db.batch([first, ...rest]);

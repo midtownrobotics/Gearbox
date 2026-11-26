@@ -224,6 +224,22 @@ describe("sending an overview", () => {
     expect(edited).toEqual(new Set(["2"]));
   });
 
+  it("leaves out cards scheduled for a later day", async () => {
+    const t = team();
+    await t.add("On the board");
+    await jsonAs(
+      t.student,
+      "/cards",
+      { method: "POST", body: { title: "Not yet", startsOn: "2099-01-01" } },
+      201,
+    );
+    await t.pickChannel();
+    expect((await callAs(t.mentor, "/overviews", { method: "POST", body: {} })).status).toBe(200);
+    const [posted] = await t.posts();
+    expect(posted.text).toContain("• On the board");
+    expect(posted.text).not.toContain("Not yet");
+  });
+
   it("edits nothing for a team that hasn't sent one", async () => {
     const t = team();
     await t.add("Quiet");
