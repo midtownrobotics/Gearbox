@@ -8,8 +8,9 @@ Planner is a board your whole team shares: add a card to **Not Started** for eac
 
 ## Who does what
 
-- **Everyone signed in** adds, renames and moves cards, and puts themselves on a card or takes themselves off.
-- **Mentors and admins** add, rename, reorder and delete the columns between Not Started and Done, send meeting overviews to the team's chat and choose their channel.
+- **Everyone signed in** adds, renames and moves cards, gives them due dates or schedules them for later, and puts themselves on a card or takes themselves off.
+- **Mentors, admins and trusted students** put anyone on a card or take them off.
+- **Mentors and admins** add, rename, reorder and delete the columns between Not Started and Done, send meeting overviews to the team's chat and choose their channel, and choose the trusted students.
 - **Admins** also delete cards.
 - **Kiosks** can look at the board but not change it.
 
@@ -18,4 +19,5 @@ Planner is a board your whole team shares: add a card to **Not Started** for eac
 | Page | What it's for |
 | --- | --- |
 | Board | The team's cards and columns, and sending a meeting overview |
-| Admin | Mentors and admins: the board's columns and the channel for meeting overviews |
+| Calendar | Cards on their due dates, and scheduled cards on the day they go on the board |
+| Admin | Mentors and admins: the board's columns, the channel for meeting overviews and trusted students |

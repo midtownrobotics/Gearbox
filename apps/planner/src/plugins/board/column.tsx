@@ -3,7 +3,9 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { focusRing } from "@g3/ui";
+import { CalendarClock } from "lucide-react";
 import type { BoardCard } from "../../shared/api";
+import { dayLabel, dueState } from "../../shared/dates";
 import { CardActions, CardPeople } from "./people";
 
 /** The width every column has side by side; on a phone they're stacked, full width. */
@@ -64,8 +66,27 @@ export function CardFace({ card, lifted = false }: { card: BoardCard; lifted?: b
         <p className="min-w-0 text-secondary-900 [overflow-wrap:anywhere]">{card.title}</p>
         {!lifted && <CardActions card={card} />}
       </div>
+      {card.dueDate && <DueDate day={card.dueDate} done={card.column === "done"} />}
       <CardPeople card={card} />
     </div>
+  );
+}
+
+/** "Due Fri, Nov 21": red once it's past, amber due today or tomorrow, gray when it's done. */
+export function DueDate({ day, done = false }: { day: string; done?: boolean }) {
+  const state = done ? "later" : dueState(day);
+  const tone =
+    state === "overdue"
+      ? "font-medium text-red-700"
+      : state === "soon"
+        ? "font-medium text-amber-700"
+        : "text-secondary-500";
+  return (
+    <p className={`flex items-center gap-1 text-xs ${tone}`}>
+      <CalendarClock aria-hidden className="size-3.5 shrink-0" />
+      {state === "overdue" ? "Overdue: " : "Due "}
+      {dayLabel(day)}
+    </p>
   );
 }
 
