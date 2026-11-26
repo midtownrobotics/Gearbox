@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { appUrl } from "@g3/site-config";
-import { Button, ErrorBanner, NotYourTeam, TextField, inputClass, useTeamNames } from "@g3/ui";
+import { Button, ErrorBanner, Field, NotYourTeam, TextField, useTeamNames } from "@g3/ui";
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { PasswordField } from "./email-fields";
+
+const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export function EmailLoginPage() {
   const names = useTeamNames();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const redirect = searchParams.get("redirect");
+  const redirect = searchParams.get("redirect") ?? "";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,18 +22,28 @@ export function EmailLoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.auth.login.email.$post({ json: { email, password } });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const res = await fetch(`${apiBase}/auth/login/email`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, redirect }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        next?: string;
+        to?: string | null;
+      };
+      // Someone who signed up and hasn't entered their name yet.
+      if (data.next) {
+        navigate(data.next);
+        return;
+      }
       if (!res.ok) {
         setError(data.error ?? "Something went wrong.");
         return;
       }
-      if (redirect) {
-        window.location.href = redirect;
-      } else {
-        // Nowhere asked for: the team's home.
-        window.location.href = `${appUrl("portal")}/`;
-      }
+      // Where they were going (checked by the worker), else the team's home.
+      window.location.href = data.to ?? `${appUrl("portal")}/`;
     } catch {
       setError("Could not reach the server. Try again.");
     } finally {
@@ -47,13 +60,9 @@ export function EmailLoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-sm text-secondary-700" htmlFor="email">
-              Email
-            </label>
+          <Field label="Email">
             <TextField
               kind="email"
-              id="email"
               type="email"
               autoComplete="email"
               placeholder="you@example.com"
@@ -62,24 +71,8 @@ export function EmailLoginPage() {
               disabled={loading}
               required
             />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm text-secondary-700" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              className={inputClass}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              required
-            />
-          </div>
+          </Field>
+          <PasswordField value={password} onChange={setPassword} disabled={loading} />
 
           {error && <ErrorBanner message={error} />}
 
@@ -88,11 +81,24 @@ export function EmailLoginPage() {
           </Button>
         </form>
 
-        <p className="text-center text-sm">
-          <Link to="/login" className="text-secondary-600 hover:text-primary-600 transition-colors">
-            ← Other sign-in options
-          </Link>
-        </p>
+        <div className="space-y-2 text-center text-sm">
+          <p>
+            <Link
+              to={`/login/forgot${email ? `?email=${encodeURIComponent(email)}` : ""}`}
+              className="text-primary-500 hover:text-primary-600 transition-colors"
+            >
+              Forgot your password?
+            </Link>
+          </p>
+          <p>
+            <Link
+              to={`/login${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""}`}
+              className="text-secondary-600 hover:text-primary-600 transition-colors"
+            >
+              ← Other sign-in options
+            </Link>
+          </p>
+        </div>
         <NotYourTeam />
       </div>
     </main>

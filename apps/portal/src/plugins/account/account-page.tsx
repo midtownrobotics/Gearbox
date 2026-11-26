@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { FaDiscord, FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { g3id as api } from "../../lib/api";
+import { PasswordSection } from "./password-card";
 
 type Identity = {
   id: string;
@@ -383,6 +384,14 @@ export function AccountPage() {
             <FaDiscord size={16} />
             Connect Discord
           </a>
+        )}
+        {/* Only on a team that signs in with email, and never from a kiosk. */}
+        {methods.email === true && me.sessionType === "oauth" && (
+          <PasswordSection
+            email={me.email}
+            hasPassword={me.identities.some((i) => i.provider === "local")}
+            onAdded={() => void loadMe()}
+          />
         )}
         {methods.slack !== false && !me.identities.some((i) => i.provider === "slack") && (
           <div className="mt-3">

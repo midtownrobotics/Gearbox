@@ -126,6 +126,9 @@ function sections(text: string) {
   return { head, tables };
 }
 
+/** Emails staging's G3ID may send in any 31 days; production's is 2,900 (its wrangler.toml). */
+const STAGING_EMAIL_LIMIT = 100;
+
 const STAGING_MARK =
   "# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----";
 
@@ -165,6 +168,9 @@ function stagingSections(tables: { name: string; lines: string[] }[], resources:
       line = line.replace(/"(https:\/\/[^"]+)"/, (_, url) => `"${stagingUrl(url)}"`);
       line = line.replace(/^ENVIRONMENT = "production"/, 'ENVIRONMENT = "staging"');
       line = line.replace(/^command = "/, 'command = "GEARBOX_STAGING=1 ');
+      // Staging sends email from the same Cloudflare account, whose 3,000 a month production's
+      // limit leaves room for (workers/g3id/src/lib/email.ts).
+      line = line.replace(/^EMAIL_LIMIT = "\d+"/, `EMAIL_LIMIT = "${STAGING_EMAIL_LIMIT}"`);
       // Staging has its own Slack app (infra/staging/resources.json): its client and app ids
       // replace production's, and production's workspace (SLACK_TEAM_ID) isn't staging's.
       const slack = line.match(/^SLACK_(CLIENT_ID|APP_ID) = /);

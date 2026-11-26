@@ -4,14 +4,15 @@ import { Card, ConfirmQuestion, ErrorBanner, Loading, Page, Switch } from "@g3/u
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
 import { FaDiscord, FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
-import { MdPersonAdd, MdPin } from "react-icons/md";
+import { MdEmail, MdPersonAdd, MdPin } from "react-icons/md";
 import { g3id } from "../../lib/api";
 
 // The ways the team's members sign in (G3ID's /admin/team/sign-in, through /api/~id). The team's
 // chat (Slack, or Discord for a team that connected Discord) is always on: members join through it.
-// Admins can also let people sign up with Google or GitHub (`openSignup`), off by default.
+// Admins can also let people sign up with Google, GitHub or email (`openSignup`), and sign in with an
+// email and password (`email`), both off by default.
 
-type Optional = "google" | "github" | "steam" | "pin";
+type Optional = "google" | "github" | "steam" | "pin" | "email";
 type State = {
   methods: Record<Optional | "slack" | "discord", boolean>;
   /** Active members who can sign in only with that method. */
@@ -20,6 +21,8 @@ type State = {
   openSignup: boolean;
   /** This site is set up for it (Turnstile). */
   openSignupReady: boolean;
+  /** This site sends email (and has Turnstile), so email and password can be switched on. */
+  emailReady: boolean;
 };
 
 const METHODS: { key: Optional; label: string; Icon: IconType; summary: string }[] = [
@@ -31,6 +34,13 @@ const METHODS: { key: Optional; label: string; Icon: IconType; summary: string }
     label: "Kiosk PIN",
     Icon: MdPin,
     summary: "Sign in on the team's shop kiosks with a 3-digit PIN.",
+  },
+  {
+    key: "email",
+    label: "Email and password",
+    Icon: MdEmail,
+    summary:
+      "Sign in with an email and password. Members add a password on their Account page, and each email is checked with a code sent to it.",
   },
 ];
 
@@ -113,6 +123,11 @@ export function SignInPage() {
                     <div>
                       <h2 className="font-semibold text-secondary-900">{label}</h2>
                       <p className="text-sm text-secondary-600">{summary}</p>
+                      {key === "email" && !on && !state.emailReady && (
+                        <p className="mt-1 text-xs text-amber-700">
+                          Not available on this site yet.
+                        </p>
+                      )}
                       {on && only > 0 && key !== "pin" && (
                         <p className="mt-1 text-xs text-amber-700">
                           {people(only)} can only sign in with {label}.
@@ -123,7 +138,7 @@ export function SignInPage() {
                   <Switch
                     checked={on}
                     label={`${label} ${on ? "on" : "off"}`}
-                    disabled={busy}
+                    disabled={busy || (key === "email" && !on && !state.emailReady)}
                     onChange={(next) =>
                       !next && only > 0 && key !== "pin" ? setAsking(key) : change(key, next)
                     }
@@ -157,7 +172,7 @@ export function SignInPage() {
   );
 }
 
-/** Letting people sign up with Google or GitHub, after a check that they're a person. */
+/** Letting people sign up with Google, GitHub or email, after a check that they're a person. */
 function OpenSignupCard({
   chat,
   state,
@@ -170,7 +185,7 @@ function OpenSignupCard({
   onChange: (on: boolean) => void;
 }) {
   const on = state.openSignup;
-  const noMethod = !state.methods.google && !state.methods.github;
+  const noMethod = !state.methods.google && !state.methods.github && !state.methods.email;
   return (
     <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
       <div className="flex min-w-0 flex-1 gap-3">
@@ -178,15 +193,15 @@ function OpenSignupCard({
         <div>
           <h2 className="font-semibold text-secondary-900">Sign-up without {chat}</h2>
           <p className="text-sm text-secondary-600">
-            Let people sign up with Google or GitHub. Anyone with your sign-up page's link can ask
-            to join, and you approve each one on Members.
+            Let people sign up with Google, GitHub or email. Anyone with your sign-up page's link
+            can ask to join, and you approve each one on Members.
           </p>
           {!state.openSignupReady && (
             <p className="mt-1 text-xs text-amber-700">Not available on this site yet.</p>
           )}
           {state.openSignupReady && on && noMethod && (
             <p className="mt-1 text-xs text-amber-700">
-              Switch on Google or GitHub above, or nobody can sign up this way.
+              Switch on Google, GitHub or email above, or nobody can sign up this way.
             </p>
           )}
         </div>

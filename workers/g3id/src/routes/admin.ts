@@ -12,6 +12,7 @@ import {
   coreUserPins,
   coreUsers,
   discordInstallations,
+  emailCodes,
   kioskActivationCodes,
   kioskDevices,
   slackInstallations,
@@ -341,6 +342,7 @@ export const adminRouter = new Hono<AppEnv>()
 
     // Source user's identities and sessions are now on the target — delete the shell
     await db.delete(coreSlackLinkCodes).where(eq(coreSlackLinkCodes.userId, id));
+    await db.delete(emailCodes).where(eq(emailCodes.userId, id));
     await db.delete(coreUsers).where(memberOf(c.get("adminTeamId") as string, id));
 
     return c.json({ message: "User merged." });
@@ -382,6 +384,7 @@ export const adminRouter = new Hono<AppEnv>()
     // couldn't be deleted.)
     await db.batch([
       db.delete(coreSlackLinkCodes).where(inArray(coreSlackLinkCodes.userId, ids)),
+      db.delete(emailCodes).where(inArray(emailCodes.userId, ids)),
       db.delete(coreSessions).where(inArray(coreSessions.userId, ids)),
       db.delete(coreUserPins).where(inArray(coreUserPins.userId, ids)),
       db.delete(coreUserIdentities).where(inArray(coreUserIdentities.userId, ids)),

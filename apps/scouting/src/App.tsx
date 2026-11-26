@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   PageLoading,
+  PersonPicker,
   Page as SharedPage,
   TextField,
   inputClass,
@@ -1267,6 +1268,7 @@ function FieldMaps({ user }: { user: User }) {
 
   async function grantAccess(event: SyntheticEvent) {
     event.preventDefault();
+    if (!publisherUserId) return;
     await api("/field-map-publishers", {
       method: "POST",
       body: JSON.stringify({ userId: publisherUserId }),
@@ -1303,25 +1305,23 @@ function FieldMaps({ user }: { user: User }) {
             <h2>Map sharing access</h2>
           </div>
           <form onSubmit={grantAccess}>
-            <select
-              className={inputClass}
-              required
+            <PersonPicker
               value={publisherUserId}
-              onChange={(event) => setPublisherUserId(event.target.value)}
-              aria-label="Account"
-            >
-              <option value="">Select an account</option>
-              {publisherOptions
+              people={publisherOptions
                 .filter(
                   (account) => !publishers.some((publisher) => publisher.email === account.email),
                 )
-                .map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.displayName} ({account.email})
-                  </option>
-                ))}
-            </select>
-            <Button variant="primary" type="submit">
+                .map((account) => ({
+                  id: account.id,
+                  displayName: account.displayName,
+                  note: account.email,
+                }))}
+              label="Account"
+              placeholder="Select an account…"
+              emptyText="Everyone has access"
+              onPick={setPublisherUserId}
+            />
+            <Button variant="primary" type="submit" disabled={!publisherUserId}>
               <Plus size={16} /> Give access
             </Button>
           </form>

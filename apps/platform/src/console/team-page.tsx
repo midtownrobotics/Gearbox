@@ -7,9 +7,9 @@ import {
   ErrorBanner,
   Page,
   PageLoading,
+  PersonPicker,
   ProgramPicker,
   TextField,
-  inputClass,
 } from "@g3/ui";
 import { type ReactNode, useCallback, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -490,25 +490,19 @@ function TransferOwner({
       description="Makes another member the team's owner and an admin."
       button="Hand over"
       onSubmit={async (reason) => {
+        if (!userId) throw new Error("Choose the new owner.");
         await send({ reason, userId, keepPreviousAdmin });
         onDone(userId);
         setUserId("");
       }}
     >
-      <select
-        required
+      <PersonPicker
         value={userId}
-        onChange={(e) => setUserId(e.target.value)}
-        className={`${inputClass} max-w-full`}
-        aria-label="New owner"
-      >
-        <option value="">Choose a member</option>
-        {others.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.displayName} ({m.email})
-          </option>
-        ))}
-      </select>
+        people={others.map((m) => ({ id: m.id, displayName: m.displayName, note: m.email }))}
+        label="New owner"
+        placeholder="Choose a member…"
+        onPick={setUserId}
+      />
       {hasOwner && owner && (
         <label className="flex items-center gap-2 text-sm text-secondary-700">
           <input

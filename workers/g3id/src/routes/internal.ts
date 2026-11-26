@@ -24,6 +24,7 @@ import {
 } from "../lib/chat";
 import { saveDiscordInstallation } from "../lib/discord-install";
 import { signInWithDiscord } from "../lib/discord-sign-in";
+import { MOVE_EMAIL_SENDS, emailUsage } from "../lib/email";
 import { createHandoff } from "../lib/handoff";
 import { dmAdmins, dmMembers } from "../lib/member-dm";
 import { createSigninCode } from "../lib/slack-code";
@@ -54,6 +55,9 @@ const DELETE_TEAM = [
   `DELETE FROM kiosk_activation_codes WHERE team_id = ?1 OR created_by IN ${MEMBERS}`,
   `DELETE FROM kiosk_devices WHERE team_id = ?1 OR created_by IN ${MEMBERS}`,
   `DELETE FROM core_slack_link_codes WHERE team_id = ?1 OR ${MEMBER_ROWS}`,
+  `DELETE FROM email_codes WHERE team_id = ?1 OR ${MEMBER_ROWS}`,
+  // email_sends stays: they're counts without a team's details, and the account's sending limit
+  // (lib/email.ts) counts them for 31 days.
   "DELETE FROM slack_installations WHERE team_id = ?1",
   `UPDATE slack_installations SET installed_by = NULL WHERE installed_by IN ${MEMBERS}`,
   "DELETE FROM discord_installations WHERE team_id = ?1",
@@ -81,6 +85,8 @@ const MOVE_TEAM = [
   "UPDATE kiosk_activation_codes SET team_id = ?2 WHERE team_id = ?1",
   "UPDATE kiosk_devices SET team_id = ?2 WHERE team_id = ?1",
   "UPDATE core_slack_link_codes SET team_id = ?2 WHERE team_id = ?1",
+  "UPDATE email_codes SET team_id = ?2 WHERE team_id = ?1",
+  ...MOVE_EMAIL_SENDS,
   "UPDATE slack_installations SET team_id = ?2 WHERE team_id = ?1",
   "UPDATE discord_installations SET team_id = ?2 WHERE team_id = ?1",
   "DELETE FROM teams WHERE id = ?1",
@@ -241,6 +247,12 @@ export const internalRouter = new Hono<AppEnv>()
       .where(and(ne(coreUsers.teamId, demoTeamId), isNull(coreUsers.deletedAt)))
       .all();
     return c.json(stats);
+  })
+  // The emails G3ID sent in the sending limit's window, for the operators' console's Cloudflare
+  // page: counts by day, kind and team, never an address (lib/email.ts).
+  .get("/email/usage", async (c) => {
+    c.header("Cache-Control", "private, no-store");
+    return c.json(await emailUsage(c.env));
   })
   // How many accounts each team in ?teams= (ids, comma-separated) has, for the operators'
   // console's Teams page and a team's page: counts only, never who. Active members, with how many
