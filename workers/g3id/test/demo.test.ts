@@ -86,6 +86,7 @@ describe("the demo team", () => {
       github: false,
       steam: false,
       pin: false,
+      email: false,
       openSignup: false,
       demo: true,
     });

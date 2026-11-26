@@ -99,7 +99,31 @@ describe("the Cloudflare page", () => {
     const written = data.meters.find((m) => m.key === "d1RowsWritten");
     expect(written?.cost).toBeCloseTo(10);
     expect(data.estimate.total).toBeCloseTo(15);
-    expect(data.warnings.map((w) => w.label)).toEqual(["Workers: Requests", "D1: Rows written"]);
+    expect(data.warnings.map((w) => w.label)).toEqual([
+      "Workers: Requests",
+      "D1: Rows written",
+      "Email: Emails sent",
+      "Email: G3ID's limit (31 days)",
+    ]);
+
+    // Email: Cloudflare's count against what's included, and G3ID's own against its limit.
+    expect(data.email).toEqual({
+      ok: true,
+      data: {
+        sent: 2510,
+        byStatus: [
+          { name: "delivered", count: 2500 },
+          { name: "deliveryFailed", count: 10 },
+        ],
+        byDomain: [{ name: "frcgearbox.com", count: 2510 }],
+      },
+    });
+    expect(data.meters.find((m) => m.key === "emailSent")).toMatchObject({
+      used: 2510,
+      included: 3000,
+      cost: 0,
+    });
+    expect(data.gearboxEmail).toMatchObject({ ok: true, data: { sent: 2400, limit: 2900 } });
 
     expect(data.zones).toMatchObject({
       ok: true,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, Loading, Page, PersonPicker } from "@g3/ui";
 import { useState } from "react";
 import { api, unwrap } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
@@ -17,7 +17,6 @@ export function AdminPage() {
     () => (user.isMentor ? unwrap(api.members.$get()) : Promise.resolve(null)),
     [],
   );
-  const [chosen, setChosen] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -81,35 +80,20 @@ export function AdminPage() {
               </li>
             ))}
           </ul>
-          <form
-            className="flex flex-wrap items-end gap-2 border-t border-secondary-200 pt-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void run(() =>
-                unwrap(api.editors[":userId"].$put({ param: { userId: chosen } })),
-              ).then(() => setChosen(""));
-            }}
-          >
-            <div className="min-w-48 flex-1">
-              <Field label="Add a student">
-                <select
-                  className={inputClass}
-                  value={chosen}
-                  onChange={(e) => setChosen(e.target.value)}
-                >
-                  <option value="">Choose…</option>
-                  {candidates.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.displayName}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <Button type="submit" disabled={saving || !chosen}>
-              Add
-            </Button>
-          </form>
+          <div className="border-t border-secondary-200 pt-4">
+            <Field label="Add a student">
+              <PersonPicker
+                people={candidates}
+                label="Add a trusted student"
+                placeholder="Search students…"
+                emptyText="Every student is trusted."
+                disabled={saving}
+                onPick={(userId) =>
+                  void run(() => unwrap(api.editors[":userId"].$put({ param: { userId } })))
+                }
+              />
+            </Field>
+          </div>
         </div>
       </Card>
     </Page>

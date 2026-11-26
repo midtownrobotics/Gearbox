@@ -36,6 +36,13 @@ export type AppEnv = {
      */
     TURNSTILE_SITE_KEY?: string;
     TURNSTILE_SECRET_KEY?: string;
+    /**
+     * Cloudflare Email Service, for email sign-in's codes (lib/email.ts; docs/deploy.md, "Email"),
+     * and how many emails it may send in any 31 days. Without both, nothing is emailed and email
+     * sign-in can't be switched on.
+     */
+    EMAIL?: SendEmail;
+    EMAIL_LIMIT?: string;
     STEAM_API_KEY: string;
     STEAM_REDIRECT_URI: string;
     FRONTEND_URL: string;

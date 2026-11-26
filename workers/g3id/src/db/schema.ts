@@ -5,6 +5,7 @@ import {
   check,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   unique,
@@ -57,6 +58,8 @@ export const teamSignInMethods = sqliteTable("team_sign_in_methods", {
   kioskPin: integer("kiosk_pin").notNull().default(1),
   /** People can sign up with Google or GitHub, not only the team's chat (migration 0023). */
   openSignup: integer("open_signup").notNull().default(0),
+  /** Email and password sign-in, off by default (migration 0026, lib/email-sign-in.ts). */
+  emailPassword: integer("email_password").notNull().default(0),
   updatedAt: integer("updated_at").notNull(),
   updatedBy: text("updated_by").references((): AnySQLiteColumn => coreUsers.id, {
     onDelete: "set null",
@@ -246,3 +249,42 @@ export const discordInstallations = sqliteTable("discord_installations", {
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
+
+/**
+ * Codes emailed to check an address (migration 0026, lib/email-sign-in.ts): only their hash, and
+ * the new password's hash until the code is used. Deleted a day after they're made.
+ */
+export const emailCodes = sqliteTable(
+  "email_codes",
+  {
+    id: text("id").primaryKey(),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id),
+    purpose: text("purpose", { enum: ["add-password", "signup", "reset"] }).notNull(),
+    email: text("email").notNull(),
+    userId: text("user_id").references(() => coreUsers.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    passwordHash: text("password_hash"),
+    attempts: integer("attempts").notNull().default(0),
+    usedAt: integer("used_at"),
+    expiresAt: integer("expires_at").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    index("email_codes_address").on(t.teamId, t.email, t.createdAt),
+    index("email_codes_created").on(t.createdAt),
+  ],
+);
+
+/** Emails sent, by UTC day (YYYY-MM-DD), team and kind; never the address (lib/email.ts). */
+export const emailSends = sqliteTable(
+  "email_sends",
+  {
+    day: text("day").notNull(),
+    teamId: text("team_id").notNull(),
+    kind: text("kind").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.teamId, t.kind] })],
+);

@@ -2,6 +2,7 @@
 import { ErrorBanner, NotYourTeam, PublicSiteLink, buttonClass, useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { FaDiscord, FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
+import { MdEmail } from "react-icons/md";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
@@ -72,6 +73,13 @@ export function LoginPage() {
               Sign in with {label}
             </a>
           ))}
+          {/* Off unless the team switched it on. */}
+          {methods.email === true && (
+            <Link to={`/login/email${rp}`} className={`${buttonClass("secondary")} w-full`}>
+              <MdEmail size={20} />
+              Sign in with email
+            </Link>
+          )}
         </div>
 
         <p className="text-center text-sm text-secondary-500">

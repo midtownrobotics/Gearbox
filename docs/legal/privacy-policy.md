@@ -1,6 +1,6 @@
 # Gearbox Privacy Policy
 
-Last updated: 17 November 2026.
+Last updated: 20 November 2026.
 
 ## In short
 
@@ -105,7 +105,8 @@ Team admins can export selected Scouting game-season records and available files
 | Sites your team links to | A team's own links on its home page show each site's icon | When you open your team's home, your browser loads each linked site's icon from that site, which sees your IP address as it would on any visit. Gearbox doesn't store the icons |
 | Share-A-Cart | Building vendor carts in Orders | Only if your team connects it; it receives the items in a cart |
 | Cloudflare Workers AI | Reading a photographed match schedule in Scouting | Only when a member uses that feature; it receives the photo |
-| Cloudflare Turnstile | Checks that someone signing up with Google or GitHub is a person | Only on the sign-up page of a team that lets people sign up without its chat. Your browser loads the check from Cloudflare, which sees your IP address and information about your browser. We store nothing from it |
+| Cloudflare Email Service | Sends the codes that check an email address before a password works | Only on a team that signs in with email and password, when someone adds a password, signs up with email or resets a forgotten password: it receives the email address and the message with the code |
+| Cloudflare Turnstile | Checks that someone signing up with Google, GitHub or email, or resetting a password, is a person | Only on the sign-up and password-reset pages of a team that uses them. Your browser loads the check from Cloudflare, which sees your IP address and information about your browser. We store nothing from it |
 
 Each of these services has its own privacy policy. Services your team connects are your team's choice, and your team can disconnect them.
 
@@ -120,6 +121,8 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Information | Kept for |
 | --- | --- |
 | Sign-in sessions | 7 days from sign-in |
+| Codes emailed to check an address (the address, and the code only as a one-way hash) | 1 day; a code works for 15 minutes |
+| How many emails we sent, by day, team and reason (never the address) | Kept; they are totals and identify no one |
 | Your account | Until a team admin deletes it, which removes it and your sign-ins at once, or until your team is deleted |
 | Team data | While the team is registered. Deleted within 30 days after the team closes |
 | Uploaded files in Shop, Scouting and Pit | Admins can turn automatic capacity deletion off for the team on Storage; existing files then stay and uploads that exceed an allowance are blocked, including Pit logs. The default keeps the existing automatic-cleanup behavior. Policy changes are logged and active admins are notified through connected chat, best effort. The choice applies to new uploads; cleanup already running may finish. If the policy cannot be checked, files are kept and growth above the cap is refused. With automatic deletion on, when new uploads would exceed an app's cap, files older than six calendar months are permanently removed first, followed by the oldest remaining files as needed to target 90% usage. Recent files can also be removed. Unknown-date files are considered last. Incoming files are not selected for cleanup; an upload too large for the allowance is refused. Pit's match logs are only removed this way when the team chooses it. Written Scouting reports and auton steps remain when images are removed. Admins can review usage and eligible files and download copies on Storage. Usage warnings at 90%, 95%, and 100%, and cleanup summaries, are best effort through the team log and connected chat. Storage counts and file lists may be cached internally for one minute. Existing team/app deletion and demo lifecycle rules still apply |
