@@ -274,7 +274,7 @@ From reading the code on 11 October. None was confirmed in a running app, and on
 | Pit | Two pages were titled "Checklists": the one you run and the one you edit | Fixed in step 2: the second is Edit Checklists |
 | Orders, Inventory | Dates were always in US English | Fixed in step 2. Prices are still formatted the US way (`Intl.NumberFormat("en-US", …)`), which wasn't part of this |
 | Pit, Shop | `lucide-react` and `react-icons` were installed and never imported | Fixed in step 2 |
-| Inventory | The table's search and filters reset on a reload or Back | Fixed in step 2: they are in the address (`q`, `status`, `location`, `robot`). An entry's "← All entries" link still opens the table without them |
+| Inventory | The table's search and filters reset on a reload or Back | Fixed in step 2: they are in the address (`q`, `status`, `location`, `robot`), and an entry's "← Back" returns to the page that opened it, with its filters or Locations' open panels and search |
 | Shop | Its Admin page shows "Obsolete instances deleted successfully" in the error banner | Fixed in step 6 |
 | Shop | Six error and warning messages used classes that don't exist (`bg-crimson-50`, `border-crimson-200`), so they had no background or border: Admin's Onshape, Slack and summary messages, and three on Ingest | Fixed in step 6 |
 | Shop | The drawing viewer (`/part/:partNumber/view`) was a screen tall under the bar, so it always scrolled | Fixed in step 6 |

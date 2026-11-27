@@ -15,6 +15,17 @@ const lib = {};
 new Function("exports", compiled.outputText)(lib);
 const { isStep, parseQuantity, quantityPatch } = lib;
 
+const navigationSource = fs.readFileSync(
+  path.join(__dirname, "../src/shared/entry-navigation.ts"),
+  "utf8",
+);
+const navigationCompiled = ts.transpileModule(navigationSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+});
+const navigation = {};
+new Function("exports", navigationCompiled.outputText)(navigation);
+const { entryBackTarget } = navigation;
+
 /** A native number input's spinner changes the value without blurring; that change must save. */
 test("spinner step produces a save patch for the new quantity", () => {
   const parsed = parseQuantity("7");
@@ -43,5 +54,32 @@ test("arrow steps save as they happen; typing, deleting and undo wait for Enter 
   for (const step of [undefined, ""]) assert.equal(isStep(step), true);
   for (const typed of ["insertText", "insertFromPaste", "deleteContentBackward", "historyUndo"]) {
     assert.equal(isStep(typed), false, typed);
+  }
+});
+
+test("returning from an entry restores the originating Locations panels and search", () => {
+  const view = { toggled: [[12, true]], query: "wire" };
+  assert.deepEqual(entryBackTarget({ from: "/locations", fromState: view }), {
+    to: "/locations",
+    state: view,
+  });
+});
+
+test("returning from an entry preserves Inventory table filters", () => {
+  assert.deepEqual(entryBackTarget({ from: "/inventory?q=wire&location=4" }), {
+    to: "/inventory?q=wire&location=4",
+  });
+});
+
+test("direct entry visits and unsafe return destinations fall back to Inventory", () => {
+  const unsafeStates = [
+    null,
+    {},
+    { from: "https://example.com" },
+    { from: "//example.com" },
+    { from: "/\\example.com" },
+  ];
+  for (const state of unsafeStates) {
+    assert.deepEqual(entryBackTarget(state), { to: "/inventory" });
   }
 });

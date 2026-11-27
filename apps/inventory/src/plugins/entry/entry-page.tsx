@@ -3,10 +3,11 @@ import { appUrl } from "@g3/site-config";
 import { Button, Card, Dialog, ErrorBanner, Field, Loading, Page, TextField } from "@g3/ui";
 import type { ItemView } from "@g3/worker-inventory";
 import { type FormEvent, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { useOrdersOn } from "../../shared/catalog";
+import { entryBackTarget } from "../../shared/entry-navigation";
 import { type Draft, FieldInputs, ValueView, draftOf, valuesOf } from "../../shared/field-inputs";
 import { count, formatDate, formatDateTime } from "../../shared/format";
 import { useInventory } from "../../shared/inventory-data";
@@ -448,6 +449,8 @@ function DeleteDialog({ item, onClose }: { item: ItemView; onClose: () => void }
 /** One entry: its details, where its parts are, how it's bought, and everything done to it. */
 export function EntryPage() {
   const { id } = useParams();
+  const location = useLocation();
+  const backTarget = entryBackTarget(location.state);
   const { reload } = useInventory();
   const { isMentor } = useAuthUser();
   const [dialog, setDialog] = useState<"merge" | "delete" | null>(null);
@@ -458,8 +461,12 @@ export function EntryPage() {
   }, [id]);
 
   const back = (
-    <Link to="/inventory" className="text-sm text-secondary-500 hover:text-primary-600">
-      ← All entries
+    <Link
+      to={backTarget.to}
+      state={backTarget.state}
+      className="text-sm text-secondary-500 hover:text-primary-600"
+    >
+      ← Back
     </Link>
   );
   if (detail.error) {
