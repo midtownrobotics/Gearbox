@@ -1,5 +1,11 @@
 # @g3/worker-skill-tree
 
+## 2.3.1
+
+### Patch Changes
+
+- f751761: Choosing a person anywhere (shop managers, trusted students, members to manage, merge or message, Scouting's crews and leads, a Skill Tree student) is now a search box: type part of a name, or open the list.
+
 ## 2.3.0
 
 ### Minor Changes
