@@ -33,6 +33,8 @@ describe("sign-in methods", () => {
       slack: true,
       discord: false,
       ...all,
+      // Email and password is off until a team chooses it.
+      email: false,
       openSignup: false,
       demo: false,
     });

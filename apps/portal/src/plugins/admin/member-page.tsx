@@ -206,11 +206,7 @@ export function MemberPage() {
       {user && (
         <>
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-primary-500 flex items-center justify-center text-xl font-semibold text-on-primary shrink-0">
-              {user.displayName.charAt(0).toUpperCase()}
-            </div>
             <div className="min-w-0">
-              <p className="truncate text-sm text-secondary-600">{user.email}</p>
               {user.status === "pending" && user.needsName === 1 && (
                 <p className="text-sm text-secondary-500">Hasn't entered their name yet.</p>
               )}

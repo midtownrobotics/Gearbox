@@ -19,7 +19,7 @@ On a phone, each row is two lines: the entry with its button, then its location,
 
 ## Count
 
-Type the real quantity into a row. That records a count, with who and when, in the entry's history. An entry counted in a unit shows it after the number ("40 ft").
+Type the real quantity into a row and press Enter, or step it up or down with the arrows beside it. That records a count, with who and when, in the entry's history. An entry counted in a unit shows it after the number ("40 ft").
 
 ## Move
 

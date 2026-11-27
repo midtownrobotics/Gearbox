@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { createDb } from "../db";
 import { coreUserIdentities, coreUsers } from "../db/schema";
 import { chatProvider } from "../lib/chat";
+import { emailSignInReady, saveEmailSignIn } from "../lib/email-sign-in";
 import { openSignupChosen, openSignupOn, saveOpenSignup, turnstileReady } from "../lib/open-signup";
 import {
   METHOD_LABELS,
@@ -27,8 +28,13 @@ type Db = ReturnType<typeof createDb>;
 /** Slack and Discord: a team's chat is always on, so it never locks anyone out. */
 const isChat = (provider: string) => provider === "slack" || provider === "discord";
 
+type Switchable = OptionalMethod | "email";
+
+/** A sign-in's provider as the method that switches it (a password is `local`). */
+const methodOf = (provider: string) => (provider === "local" ? "email" : provider);
+
 /** For each method that can be switched off: how many active members have only it to sign in with. */
-async function onlyWith(db: Db, teamId: string): Promise<Record<OptionalMethod, number>> {
+async function onlyWith(db: Db, teamId: string): Promise<Record<Switchable, number>> {
   const rows = await db
     .select({ userId: coreUserIdentities.userId, provider: coreUserIdentities.provider })
     .from(coreUserIdentities)
@@ -36,11 +42,13 @@ async function onlyWith(db: Db, teamId: string): Promise<Record<OptionalMethod, 
     .where(and(eq(coreUsers.teamId, teamId), eq(coreUsers.status, "active")))
     .all();
   const byUser = new Map<string, Set<string>>();
-  for (const r of rows) byUser.set(r.userId, (byUser.get(r.userId) ?? new Set()).add(r.provider));
-  const counts = { google: 0, github: 0, steam: 0, pin: 0 };
+  for (const r of rows) {
+    byUser.set(r.userId, (byUser.get(r.userId) ?? new Set()).add(methodOf(r.provider)));
+  }
+  const counts = { google: 0, github: 0, steam: 0, pin: 0, email: 0 };
   for (const providers of byUser.values()) {
     const ways = [...providers].filter((p) => isChat(p) || p in counts);
-    if (ways.length === 1 && !isChat(ways[0])) counts[ways[0] as OptionalMethod]++;
+    if (ways.length === 1 && !isChat(ways[0])) counts[ways[0] as Switchable]++;
   }
   return counts;
 }
@@ -50,17 +58,19 @@ export const teamSignInRouter = new Hono<AppEnv>()
   .get("/", async (c) => {
     c.header("Cache-Control", "public, max-age=60");
     const team = requestTeamId(c);
-    const [methods, open] = await Promise.all([
+    const [chosen, open] = await Promise.all([
       signInMethods(createDb(c.env.DB), team),
       openSignupOn(c.env, team),
     ]);
-    // `openSignup`: the sign-up page offers Google and GitHub (those that are on), behind a
-    // Turnstile check with `turnstileSiteKey`.
-    const openSignup = open && (methods.google || methods.github);
+    // Email and password only once this site can send email too.
+    const methods = { ...chosen, email: chosen.email && emailSignInReady(c.env) };
+    // `openSignup`: the sign-up page offers Google, GitHub and email (those that are on), behind
+    // a Turnstile check with `turnstileSiteKey`, which email's forgotten-password form uses too.
+    const openSignup = open && (methods.google || methods.github || methods.email);
     return c.json({
       ...methods,
       openSignup,
-      ...(openSignup ? { turnstileSiteKey: c.env.TURNSTILE_SITE_KEY } : {}),
+      ...(openSignup || methods.email ? { turnstileSiteKey: c.env.TURNSTILE_SITE_KEY } : {}),
       // `demo`: the public demo's sign-in page offers its roles instead.
       demo: isDemoTeam(team),
     });
@@ -75,7 +85,8 @@ export const teamChatRouter = new Hono<AppEnv>().get("/", async (c) => {
 
 /**
  * The Sign-in page's view: the methods, who'd be locked out, whether people can sign up without
- * chat (`openSignup`) and whether this site is set up for it (`openSignupReady`: Turnstile's keys).
+ * chat (`openSignup`) and whether this site is set up for it (`openSignupReady`: Turnstile's keys)
+ * and for email and password (`emailReady`: it sends email and has Turnstile).
  */
 async function adminView(env: AppEnv["Bindings"], db: Db, team: string) {
   const [methods, only, openSignup] = await Promise.all([
@@ -83,7 +94,13 @@ async function adminView(env: AppEnv["Bindings"], db: Db, team: string) {
     onlyWith(db, team),
     openSignupChosen(db, team),
   ]);
-  return { methods, onlyWith: only, openSignup, openSignupReady: turnstileReady(env) };
+  return {
+    methods,
+    onlyWith: only,
+    openSignup,
+    openSignupReady: turnstileReady(env),
+    emailReady: emailSignInReady(env),
+  };
 }
 
 export const adminSignInRouter = new Hono<AppEnv>()
@@ -101,6 +118,10 @@ export const adminSignInRouter = new Hono<AppEnv>()
     if (body?.openSignup === true && !turnstileReady(c.env)) {
       return c.json({ error: "Signing up without chat isn't set up on this site yet." }, 400);
     }
+    // Email and password is optional in the body: a page from before it keeps the team's choice.
+    if (body && "email" in body && typeof body.email !== "boolean") {
+      return c.json({ error: "Say on or off for each." }, 400);
+    }
     const next = {} as Record<OptionalMethod, boolean>;
     for (const m of OPTIONAL_METHODS) {
       if (typeof body?.[m] !== "boolean") return c.json({ error: "Say on or off for each." }, 400);
@@ -109,6 +130,11 @@ export const adminSignInRouter = new Hono<AppEnv>()
     const db = createDb(c.env.DB);
     const userId = c.get("userId") as string;
     const team = await teamOfUser(db, userId);
+    const before = await signInMethods(db, team);
+    const email = typeof body?.email === "boolean" ? body.email : before.email;
+    if (email && !before.email && !emailSignInReady(c.env)) {
+      return c.json({ error: "Email and password sign-in isn't set up on this site yet." }, 400);
+    }
 
     // An admin who can only sign in with a method they're switching off would be locked out.
     const mine = await db
@@ -117,15 +143,20 @@ export const adminSignInRouter = new Hono<AppEnv>()
       .where(
         and(
           eq(coreUserIdentities.userId, userId),
-          inArray(coreUserIdentities.provider, ["slack", "discord", "google", "github", "steam"]),
+          inArray(coreUserIdentities.provider, [
+            "slack",
+            "discord",
+            "google",
+            "github",
+            "steam",
+            "local",
+          ]),
         ),
       )
       .all();
-    const before = await signInMethods(db, team);
     const chat = before.discord ? "discord" : "slack";
-    const stillIn = mine.some(
-      (i) => i.provider === chat || next[i.provider as OptionalMethod] === true,
-    );
+    const on: Record<string, boolean> = { ...next, email };
+    const stillIn = mine.some((i) => i.provider === chat || on[methodOf(i.provider)] === true);
     if (mine.length > 0 && !stillIn) {
       return c.json(
         {
@@ -139,6 +170,10 @@ export const adminSignInRouter = new Hono<AppEnv>()
     const changed = OPTIONAL_METHODS.filter((m) => before[m] !== next[m]).map(
       (m) => `${METHOD_LABELS[m]} ${next[m] ? "on" : "off"}`,
     );
+    if (email !== before.email) {
+      await saveEmailSignIn(db, team, email, userId);
+      changed.push(`${METHOD_LABELS.email} ${email ? "on" : "off"}`);
+    }
     if (typeof body?.openSignup === "boolean") {
       const openBefore = await openSignupChosen(db, team);
       if (openBefore !== body.openSignup) {

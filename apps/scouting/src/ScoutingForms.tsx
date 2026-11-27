@@ -7,6 +7,7 @@ import {
   Dialog,
   ErrorBanner,
   Loading,
+  PersonPicker,
   Page as SharedPage,
   TextField,
   chatName,
@@ -1298,31 +1299,30 @@ function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
         <form
           onSubmit={async (event) => {
             event.preventDefault();
+            if (!userId) return;
             if (!(await questions.confirm("Make this person a Strategy lead?"))) return;
             await api("/strategy-admins", { method: "POST", body: JSON.stringify({ userId }) });
             setUserId("");
             await load();
           }}
         >
-          <select
-            className={inputClass}
-            required
+          <PersonPicker
             value={userId}
-            onChange={(event) => setUserId(event.target.value)}
-          >
-            <option value="">Select a member</option>
-            {users
+            people={users
               .filter((user) => user.status === "active")
               .map((user) => {
                 const isLead = admins.some((admin) => admin.user_id === user.id);
-                return (
-                  <option key={user.id} value={user.id} disabled={isLead}>
-                    {isLead ? "🛡 Strategy lead · " : ""}
-                    {user.displayName} ({user.email})
-                  </option>
-                );
+                return {
+                  id: user.id,
+                  displayName: user.displayName,
+                  note: isLead ? "🛡 Strategy lead" : user.email,
+                  disabled: isLead,
+                };
               })}
-          </select>
+            label="Member"
+            placeholder="Select a member…"
+            onPick={setUserId}
+          />
           <Button variant="primary" type="submit">
             <Plus size={16} /> Add Strategy Lead
           </Button>

@@ -2,8 +2,9 @@
 import { Card, Page, TextField, inputClass } from "@g3/ui";
 import type { StockView } from "@g3/worker-inventory";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAuthUser } from "../../shared/auth";
+import type { EntryNavigationState } from "../../shared/entry-navigation";
 import { valueText } from "../../shared/field-inputs";
 import { count } from "../../shared/format";
 import { useInventory } from "../../shared/inventory-data";
@@ -129,8 +130,14 @@ function NarrowCell({
 function NarrowRows({
   rows,
   places,
+  entryState,
   onAction,
-}: { rows: Row[]; places: Places; onAction: (action: StockAction) => void }) {
+}: {
+  rows: Row[];
+  places: Places;
+  entryState: EntryNavigationState;
+  onAction: (action: StockAction) => void;
+}) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_max-content_max-content] text-sm">
       <div
@@ -157,6 +164,7 @@ function NarrowRows({
             <NarrowCell first className={checks ? "col-span-2" : "col-span-full"}>
               <Link
                 to={`/items/${item.id}`}
+                state={entryState}
                 className="break-words font-semibold text-secondary-900 hover:text-primary-600"
               >
                 {item.name}
@@ -209,6 +217,10 @@ function NarrowRows({
  */
 export function TablePage() {
   const { items, fields, places } = useInventory();
+  const location = useLocation();
+  const entryState: EntryNavigationState = {
+    from: `${location.pathname}${location.search}`,
+  };
   const user = useAuthUser();
   // The search and filters live in the address, so a reload or coming back from an entry keeps
   // them.
@@ -306,7 +318,12 @@ export function TablePage() {
 
           <div className="relative overflow-x-auto rounded-xl border border-secondary-200 bg-surface">
             {narrow ? (
-              <NarrowRows rows={rows.slice(0, shown)} places={places} onAction={setAction} />
+              <NarrowRows
+                rows={rows.slice(0, shown)}
+                places={places}
+                entryState={entryState}
+                onAction={setAction}
+              />
             ) : (
               <table className="w-full text-left text-sm">
                 <thead>
@@ -331,6 +348,7 @@ export function TablePage() {
                       <td className="px-4 py-2.5">
                         <Link
                           to={`/items/${item.id}`}
+                          state={entryState}
                           className="font-semibold text-secondary-900 hover:text-primary-600"
                         >
                           {item.name}

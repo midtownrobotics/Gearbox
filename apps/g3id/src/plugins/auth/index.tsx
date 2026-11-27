@@ -4,10 +4,12 @@ import type { Plugin } from "../../shared/plugin-types";
 import { CheckPage } from "./check-page";
 import { DemoPage } from "./demo-page";
 import { EmailLoginPage } from "./email-login-page";
+import { ForgotPage } from "./forgot-page";
 import { LoginPage } from "./login-page";
 import { NamePage } from "./name-page";
 import { OAuthErrorPage } from "./oauth-error-page";
 import { PendingPage } from "./pending-page";
+import { SignupEmailPage } from "./signup-email-page";
 import { SignupPage } from "./signup-page";
 import { SlackLoginPage } from "./slack-login-page";
 
@@ -17,10 +19,12 @@ export const authPlugin: Plugin = {
     { path: "/login", element: <LoginPage /> },
     { path: "/demo", element: <DemoPage /> },
     { path: "/login/email", element: <EmailLoginPage /> },
+    { path: "/login/forgot", element: <ForgotPage /> },
     { path: "/login/error", element: <OAuthErrorPage /> },
     { path: "/login/slack", element: <SlackLoginPage /> },
     { path: "/signup", element: <SignupPage /> },
     { path: "/signup/check", element: <CheckPage /> },
+    { path: "/signup/email", element: <SignupEmailPage /> },
     { path: "/signup/name", element: <NamePage /> },
     { path: "/signup/pending", element: <PendingPage /> },
     // ID only signs people in: the account page is on the team's home now.

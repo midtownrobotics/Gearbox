@@ -6,6 +6,7 @@ import {
   ErrorBanner,
   Page,
   PageLoading,
+  PersonPicker,
   SuccessBanner,
   chatName,
   inputClass,
@@ -293,21 +294,20 @@ function PeopleList({
           })}
         </ul>
       )}
-      <select
+      <PersonPicker
         id={id}
-        value=""
-        onChange={(e) => e.target.value && onChange([...chosen, e.target.value])}
-        className={`${inputClass} max-w-full sm:w-auto`}
-      >
-        <option value="">Add a person…</option>
-        {available.map((m) => (
-          <option key={m.id} value={m.id} disabled={!m.hasChat}>
-            {m.displayName}
-            {m.isAdmin ? " (admin)" : ""}
-            {m.hasChat ? "" : ` (no ${chat} linked)`}
-          </option>
-        ))}
-      </select>
+        className="sm:max-w-sm"
+        people={available.map((m) => ({
+          id: m.id,
+          displayName: m.displayName,
+          note: m.hasChat ? (m.isAdmin ? "Admin" : undefined) : `No ${chat} linked`,
+          disabled: !m.hasChat,
+        }))}
+        label={`Also message directly on ${chat}`}
+        placeholder="Add a person…"
+        emptyText="Everyone is added"
+        onPick={(userId) => onChange([...chosen, userId])}
+      />
     </div>
   );
 }

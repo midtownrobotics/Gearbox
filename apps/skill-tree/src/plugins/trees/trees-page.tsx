@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Card, Page, inputClass } from "@g3/ui";
+import { Card, Page, PersonPicker, inputClass } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuthUser } from "../../shared/auth";
@@ -101,21 +101,21 @@ export function TreesPage() {
       width="wide"
       actions={
         students.length > 0 && (
-          <label className="flex items-center gap-2 text-sm font-medium text-secondary-700">
+          <div className="flex items-center gap-2 text-sm font-medium text-secondary-700">
             Student
-            <select
-              className={`${inputClass} w-56`}
+            <PersonPicker
+              className="w-56"
               value={student?.userId ?? ""}
-              onChange={(e) => setParam({ student: e.target.value })}
-            >
-              {students.map((s) => (
-                <option key={s.userId} value={s.userId}>
-                  {s.name}
-                  {s.userId === user.userId ? " (you)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+              people={students.map((s) => ({
+                id: s.userId,
+                displayName: s.name,
+                note: s.userId === user.userId ? "You" : undefined,
+              }))}
+              label="Student"
+              placeholder="Choose a student…"
+              onPick={(id) => setParam({ student: id })}
+            />
+          </div>
         )
       }
     >

@@ -4,7 +4,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 // Signed up with Google or GitHub (`with`): they may not be on the team's chat, so nothing says
 // they'll hear there.
-const PROVIDER_LABELS: Record<string, string> = { google: "Google", github: "GitHub" };
+const PROVIDER_LABELS: Record<string, string> = {
+  google: "Google",
+  github: "GitHub",
+  email: "your email and password",
+};
 
 export function PendingPage() {
   const navigate = useNavigate();

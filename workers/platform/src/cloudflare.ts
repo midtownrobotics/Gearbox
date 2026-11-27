@@ -51,6 +51,8 @@ export const PLAN = {
   queueOperations: { included: 1e6, price: 0.4, per: 1e6 },
   /** Per UTC day, not per month. */
   aiNeuronsDaily: { included: 10_000, price: 0.011, per: 1000 },
+  /** Email Service's Email Sending (read 20 November 2026). G3ID stops before it's used up. */
+  emailSending: { included: 3000, price: 0.35, per: 1000 },
   /** Largest a D1 database may grow (a limit, not a price). */
   d1DatabaseMaxBytes: 10e9,
 };
@@ -136,6 +138,27 @@ export type Deploy = {
 };
 export type WorkerDeploys = { name: string; modifiedAt: number | null; deploys: Deploy[] };
 
+/** What Cloudflare counted for Email Sending this period, across the account's zones. */
+export type EmailSent = {
+  sent: number;
+  byStatus: { name: string; count: number }[];
+  byDomain: { name: string; count: number }[];
+};
+
+/**
+ * What G3ID sent, by its own count (workers/g3id/src/lib/email.ts): the last 31 days against its
+ * limit, which it stops at. Counts only, never an address.
+ */
+export type GearboxEmail = {
+  ready: boolean;
+  limit: number;
+  windowDays: number;
+  sent: number;
+  days: { day: string; count: number }[];
+  byKind: Record<string, number>;
+  teams: { teamId: string; count: number }[];
+};
+
 export type CloudflareOverview =
   | { configured: false }
   | {
@@ -156,6 +179,9 @@ export type CloudflareOverview =
       ai: Section<{ today: number; month: number; days: { date: string; neurons: number }[] }>;
       zones: Section<ZoneUsage[]>;
       deploys: Section<WorkerDeploys[]>;
+      email: Section<EmailSent>;
+      /** This deployment's G3ID only (production's or staging's), from its own database. */
+      gearboxEmail: Section<GearboxEmail>;
     };
 
 class CloudflareError extends Error {}
@@ -604,6 +630,40 @@ async function zones(env: Env, p: Period, now: Date): Promise<ZoneUsage[]> {
   );
 }
 
+/** Email Sending's count this period on each of the account's zones. */
+async function email(env: Env, p: Period): Promise<EmailSent> {
+  const list = await rest<{ id: string; name: string }[]>(
+    env,
+    `/zones?account.id=${env.CLOUDFLARE_ACCOUNT_ID}&per_page=50`,
+  );
+  type Row = { count: number; dimensions: { status: string; sendingDomain: string } };
+  const statuses = new Map<string, number>();
+  const domains = new Map<string, number>();
+  for (const zone of list) {
+    const viewer = await graphql<{ zones: { emailSendingAdaptiveGroups: Row[] }[] }>(
+      env,
+      `{ viewer { zones(filter: { zoneTag: "${zone.id}" }) { emailSendingAdaptiveGroups(limit: 10000, filter: { ${betweenDates(p)} }) { count dimensions { status sendingDomain } } } } }`,
+    );
+    for (const row of viewer.zones[0]?.emailSendingAdaptiveGroups ?? []) {
+      const { status, sendingDomain } = row.dimensions;
+      statuses.set(status, (statuses.get(status) ?? 0) + row.count);
+      domains.set(sendingDomain, (domains.get(sendingDomain) ?? 0) + row.count);
+    }
+  }
+  return {
+    sent: [...statuses.values()].reduce((n, c) => n + c, 0),
+    byStatus: top(statuses, 10),
+    byDomain: top(domains, 10),
+  };
+}
+
+/** G3ID's own count, over the service binding. */
+async function gearboxEmail(env: Env): Promise<GearboxEmail> {
+  const res = await env.G3ID.fetch("http://g3id/api/internal/email/usage");
+  if (!res.ok) throw new CloudflareError(`G3ID answered ${res.status}.`);
+  return (await res.json()) as GearboxEmail;
+}
+
 const seconds = (iso: string | null | undefined) =>
   iso ? Math.floor(Date.parse(iso) / 1000) : null;
 
@@ -681,10 +741,11 @@ function metersOf(parts: {
   durableObjects: Section<DurableObjectsUsage>;
   queues: Section<{ operations: number }>;
   ai: Section<{ today: number; month: number; days: { date: string; neurons: number }[] }>;
+  email: Section<EmailSent>;
 }) {
   const meters: Meter[] = [];
   const missing: string[] = [];
-  const { workers, d1, r2, kv, durableObjects, queues, ai } = parts;
+  const { workers, d1, r2, kv, durableObjects, queues, ai, email } = parts;
   if (workers.ok) {
     meters.push(
       meter(
@@ -871,6 +932,11 @@ function metersOf(parts: {
       cost: total(ai.data.days, (d) => over(d.neurons, price)),
     });
   } else missing.push("Workers AI");
+  if (email.ok) {
+    meters.push(
+      meter("emailSent", "Email", "Emails sent", "count", email.data.sent, PLAN.emailSending),
+    );
+  } else missing.push("Email");
   return { meters, missing };
 }
 
@@ -902,7 +968,7 @@ function warningsOf(meters: Meter[], d1: Section<DatabaseUsage[]>): Warning[] {
 async function load(env: Env): Promise<CloudflareOverview> {
   const now = new Date();
   const p = await billingPeriod(env, now);
-  const [w, d, r, k, o, q, a, z, dep] = await Promise.all([
+  const [w, d, r, k, o, q, a, z, dep, e, ge] = await Promise.all([
     section(() => workers(env, p)),
     section(() => d1(env, p)),
     section(() => r2(env, p)),
@@ -912,8 +978,10 @@ async function load(env: Env): Promise<CloudflareOverview> {
     section(() => ai(env, p)),
     section(() => zones(env, p, now)),
     section(() => deploys(env)),
+    section(() => email(env, p)),
+    section(() => gearboxEmail(env)),
   ]);
-  const parts = { workers: w, d1: d, r2: r, kv: k, durableObjects: o, queues: q, ai: a };
+  const parts = { workers: w, d1: d, r2: r, kv: k, durableObjects: o, queues: q, ai: a, email: e };
   const { meters, missing } = metersOf(parts);
   const overage = total(meters, (m) => m.cost);
   return {
@@ -927,10 +995,24 @@ async function load(env: Env): Promise<CloudflareOverview> {
     },
     meters,
     estimate: { base: PLAN.base, overage, total: PLAN.base + overage, missing },
-    warnings: warningsOf(meters, d),
+    warnings: [
+      ...warningsOf(meters, d),
+      // G3ID stops sending at its limit, so operators hear before members can't get codes.
+      ...(ge.ok && ge.data.limit > 0 && ge.data.sent >= ge.data.limit * WARN_AT
+        ? [
+            {
+              label: `Email: G3ID's limit (${ge.data.windowDays} days)`,
+              used: ge.data.sent,
+              limit: ge.data.limit,
+              unit: "count" as const,
+            },
+          ]
+        : []),
+    ],
     ...parts,
     zones: z,
     deploys: dep,
+    gearboxEmail: ge,
   };
 }
 

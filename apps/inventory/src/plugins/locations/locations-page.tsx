@@ -5,14 +5,15 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
+import type { EntryNavigationState } from "../../shared/entry-navigation";
 import { count } from "../../shared/format";
 import { useInventory } from "../../shared/inventory-data";
 import { LocationPicker } from "../../shared/location-picker";
 import { type Places, labelOf, locationLabel, useLabel } from "../../shared/places";
 import { type Row, rowsOf } from "../../shared/rows";
 import { StatusBadge } from "../../shared/status-badge";
-import { type StockAction, StockActionDialog } from "../../shared/stock-cells";
-import { UnitSuffix, formatQuantity } from "../../shared/units";
+import { QuantityCell, type StockAction, StockActionDialog } from "../../shared/stock-cells";
+import { formatQuantity } from "../../shared/units";
 import { NewEntryForm } from "../table/new-entry-page";
 
 // The inventory the other way round: every location, as nested panels that open, with what's
@@ -247,6 +248,7 @@ function Panel({
   isOpen,
   toggle,
   shown,
+  entryState,
   onMoveEntry,
   onMoveAll,
   onAdd,
@@ -259,6 +261,7 @@ function Panel({
   toggle: (id: number) => void;
   /** When a search is on: the locations to show. Null shows them all. */
   shown: Set<number> | null;
+  entryState: EntryNavigationState;
   onMoveEntry: (held: Held) => void;
   onMoveAll: (row: LocationRow) => void;
   onAdd: (row: LocationRow) => void;
@@ -331,18 +334,12 @@ function Panel({
                   key={held.stock.id}
                   className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-sm"
                 >
-                  <span className="flex w-20 shrink-0 items-baseline justify-end gap-1">
-                    <span className="font-semibold tabular-nums text-secondary-900">
-                      {held.stock.quantity}
-                    </span>
-                    <UnitSuffix
-                      n={held.stock.quantity}
-                      unit={held.item.unit}
-                      className="max-w-10"
-                    />
+                  <span className="w-32 shrink-0">
+                    <QuantityCell stock={held.stock} unit={held.item.unit} compact />
                   </span>
                   <Link
                     to={`/items/${held.item.id}`}
+                    state={entryState}
                     className="min-w-0 flex-1 basis-40 text-secondary-900 hover:text-primary-600"
                   >
                     {held.item.name}
@@ -389,6 +386,7 @@ function Panel({
               isOpen={isOpen}
               toggle={toggle}
               shown={shown}
+              entryState={entryState}
               onMoveEntry={onMoveEntry}
               onMoveAll={onMoveAll}
               onAdd={onAdd}
@@ -459,6 +457,10 @@ export function LocationsPage() {
     setToggled(new Map(places.locations.map((row) => [row.id, open])));
 
   const visibleTop = top.filter((row) => !shown || shown.has(row.id));
+  const entryState: EntryNavigationState = {
+    from: `${pathname}${search}`,
+    fromState: { toggled: [...toggled], query },
+  };
 
   return (
     <Page
@@ -489,8 +491,7 @@ export function LocationsPage() {
       ) : (
         <>
           <p className="text-sm text-secondary-500">
-            What's kept where. Add entries to a location, move an entry or everything in one, and
-            describe what each place is for.
+            What's kept where. Change quantities, add entries, move parts and describe each place.
           </p>
           <TextField
             type="search"
@@ -514,6 +515,7 @@ export function LocationsPage() {
                 isOpen={isOpen}
                 toggle={toggle}
                 shown={shown}
+                entryState={entryState}
                 onMoveEntry={(held) =>
                   setAction({ kind: "move", item: held.item, stock: held.stock })
                 }
