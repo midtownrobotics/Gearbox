@@ -1,6 +1,6 @@
 {
   "name": "@g3/worker-g3id",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "license": "AGPL-3.0-only",
   "private": true,
   "exports": {

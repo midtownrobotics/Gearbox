@@ -16,6 +16,65 @@ Each release of the whole platform, newest first, with the version of every app 
 
 <!-- releases -->
 
+## 2026.11.4 (2026-11-27)
+
+| App | Version |
+| --- | --- |
+| **G3ID** | **6.1.0** (was 6.0.0) |
+| **Portal** | **2.8.0** (was 2.7.0) |
+| **Platform** | **5.1.0** (was 5.0.0) |
+| **Shop** | **5.1.1** (was 5.1.0) |
+| Pit | 4.1.0 |
+| Orders | 2.5.0 |
+| Edge | 2.5.0 |
+| Edge agent | 0.7.0 |
+| Pit log downloader | 2.4.0 |
+| **Scouting** | **4.1.1** (was 4.1.0) |
+| **Skill Tree** | **2.3.1** (was 2.3.0) |
+| **Attendance** | **2.3.1** (was 2.3.0) |
+| **Inventory** | **1.3.1** (was 1.3.0) |
+| **Schedule** | **0.5.1** (was 0.5.0) |
+
+### G3ID 6.1.0
+
+- Teams can switch on email and password sign-in on Admin → Sign-in. Members add a password on their Account page, people can sign up with email when sign-up without chat is on, and a forgotten password can be reset, each after entering a code emailed to them. The operators' console shows how many emails were sent.
+
+### Portal 2.8.0
+
+- Teams can switch on email and password sign-in on Admin → Sign-in. Members add a password on their Account page, people can sign up with email when sign-up without chat is on, and a forgotten password can be reset, each after entering a code emailed to them. The operators' console shows how many emails were sent.
+- Choosing a person anywhere (shop managers, trusted students, members to manage, merge or message, Scouting's crews and leads, a Skill Tree student) is now a search box: type part of a name, or open the list.
+- A member's admin page no longer shows a letter circle and email above their details.
+
+### Platform 5.1.0
+
+- Teams can switch on email and password sign-in on Admin → Sign-in. Members add a password on their Account page, people can sign up with email when sign-up without chat is on, and a forgotten password can be reset, each after entering a code emailed to them. The operators' console shows how many emails were sent.
+- Choosing a person anywhere (shop managers, trusted students, members to manage, merge or message, Scouting's crews and leads, a Skill Tree student) is now a search box: type part of a name, or open the list.
+
+### Shop 5.1.1
+
+- Choosing a person anywhere (shop managers, trusted students, members to manage, merge or message, Scouting's crews and leads, a Skill Tree student) is now a search box: type part of a name, or open the list.
+
+### Scouting 4.1.1
+
+- Choosing a person anywhere (shop managers, trusted students, members to manage, merge or message, Scouting's crews and leads, a Skill Tree student) is now a search box: type part of a name, or open the list.
+
+### Skill Tree 2.3.1
+
+- Choosing a person anywhere (shop managers, trusted students, members to manage, merge or message, Scouting's crews and leads, a Skill Tree student) is now a search box: type part of a name, or open the list.
+
+### Attendance 2.3.1
+
+- Choosing a person anywhere (shop managers, trusted students, members to manage, merge or message, Scouting's crews and leads, a Skill Tree student) is now a search box: type part of a name, or open the list.
+
+### Inventory 1.3.1
+
+- Fix the quantity up/down arrows on an inventory row not saving the new count.
+- Change an entry's quantity right on Locations, and Back on an entry's page returns to the page you came from, with its filters or open panels.
+
+### Schedule 0.5.1
+
+- Choosing a person anywhere (shop managers, trusted students, members to manage, merge or message, Scouting's crews and leads, a Skill Tree student) is now a search box: type part of a name, or open the list.
+
 ## 2026.11.3 (2026-11-15)
 
 | App | Version |

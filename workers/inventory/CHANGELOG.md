@@ -1,5 +1,12 @@
 # @g3/worker-inventory
 
+## 1.3.1
+
+### Patch Changes
+
+- b9c140b: Fix the quantity up/down arrows on an inventory row not saving the new count.
+- 459ef61: Change an entry's quantity right on Locations, and Back on an entry's page returns to the page you came from, with its filters or open panels.
+
 ## 1.3.0
 
 ### Minor Changes

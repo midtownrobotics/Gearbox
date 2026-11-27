@@ -1,5 +1,29 @@
 # @g3/worker-platform
 
+## 5.1.0
+
+### Minor Changes
+
+- 65779e5: Teams can switch on email and password sign-in on Admin → Sign-in. Members add a password on their Account page, people can sign up with email when sign-up without chat is on, and a forgotten password can be reset, each after entering a code emailed to them. The operators' console shows how many emails were sent.
+
+### Patch Changes
+
+- f751761: Choosing a person anywhere (shop managers, trusted students, members to manage, merge or message, Scouting's crews and leads, a Skill Tree student) is now a search box: type part of a name, or open the list.
+- Updated dependencies [65779e5]
+- Updated dependencies [b9c140b]
+- Updated dependencies [459ef61]
+- Updated dependencies [f751761]
+- Updated dependencies [dab38bb]
+  - @g3/worker-g3id@6.1.0
+  - @g3/worker-portal@2.8.0
+  - @g3/worker-inventory@1.3.1
+  - @g3/worker-attendance@2.3.1
+  - @g3/worker-schedule@0.5.1
+  - @g3/worker-scouting@4.1.1
+  - @g3/worker-shop@5.1.1
+  - @g3/worker-skill-tree@2.3.1
+  - @g3/worker-orders@2.5.0
+
 ## 5.0.0
 
 ### Major Changes

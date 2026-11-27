@@ -1,5 +1,9 @@
 # @g3/skill-tree
 
+## 2.3.1
+
+No changes in this release.
+
 ## 2.3.0
 
 No changes in this release.
